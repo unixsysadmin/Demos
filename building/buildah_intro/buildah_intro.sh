@@ -28,13 +28,24 @@ setup() {
     fi
     rpm -q buildah >/dev/null
     if [[ $? != 0 ]]; then
-	echo $0 requires the buildah package to be installed
+       echo $0 requires the buildah package to be installed
+       exit 1
+    fi
+    bver=`buildah -v |awk '{print $3}'`
+    if (( $(echo "$bver < 1.5" | bc -l) )); then
+	echo $0 requires buildah 1.5 or greater to be installed
 	exit 1
     fi
     command -v docker > /dev/null
     if [[ $? != 0 ]]; then
 	echo $0 requires the docker package to be installed
 	exit 1
+    fi
+    grep "Red Hat Enterprise Linux Server" /etc/redhat-release > /dev/null
+    if [[ $? = 0 ]]; then
+      os=rhel
+    else
+      os=fedora
     fi
     sudo systemctl restart docker
     clear
@@ -43,6 +54,16 @@ setup() {
 intro() {
     read -p "Buildah Demos!"
     echo
+}
+
+rhel7() {
+    if [[ $os == "rhel" ]]; then
+      echo
+      echo_color "Some functionality on RHEL 7 in the demo is dependent upon"
+      echo_color "updated shadow-utils which are due to land in RHEL 7.7"
+      echo_color "See https://bugzilla.redhat.com/show_bug.cgi?id=1498628"
+      echo
+    fi
 }
 
 version() {
@@ -61,7 +82,7 @@ version() {
     read_color "buildah info"
     echo
     buildah info
-
+    rhel7
     echo
     read -p "Enter to continue"
     clear
@@ -123,13 +144,21 @@ buildah_using_from_scratch() {
     sudo ls $scratchmnt
     read -p "Enter to continue"
 
-    echo
-    echo_color "Install Fedora 29 bash and coreutils into the container from the host."
-    echo_color "Only bash and coreutils packages and their dependencies will be installed."
-    echo
-    read_color "sudo dnf install --installroot \$scratchmnt --release 29 bash coreutils --setopt install_weak_deps=false -y"
-    sudo dnf install --installroot $scratchmnt --release 29 bash coreutils --setopt install_weak_deps=false -y
-
+    if [[ $os == "fedora" ]]; then
+      echo_color "Install Fedora 29 bash and coreutils into the container from the host."
+      echo_color "Only bash and coreutils packages and their dependencies will be installed."
+      echo
+      read_color "sudo dnf install --installroot \$scratchmnt --release 29 bash coreutils --setopt install_weak_deps=false -y"
+      sudo dnf install --installroot $scratchmnt --release 29 bash coreutils --setopt install_weak_deps=false -y
+    fi
+    
+if [[ $os == "rhel" ]]; then
+      echo_color "Install RHEL 7 bash and coreutils into the container from the host."
+      echo_color "Only bash and coreutils packages and their dependencies will be installed."
+      echo
+      read_color "sudo yum install -y --installroot \$scratchmnt --release 7 bash coreutils"
+      sudo yum install -y --installroot $scratchmnt --release 7 bash coreutils
+    fi
 
     echo
     echo_color "Show the contents of the mountpoint post install"
@@ -183,8 +212,8 @@ EOF
 
     echo
     echo
-    read_color "sudo buildah config --author \"buildahdemo\" --label name=fedora29-bashecho \$newcontainer"
-    sudo buildah config --author "buildahdemo at redhat.com" --label name=fedora29-bashecho $newcontainer
+    read_color "sudo buildah config --author \"buildahdemo\" --label name=democontainer-bashecho \$newcontainer"
+    sudo buildah config --author "buildahdemo at redhat.com" --label name=democontainer-bashecho $newcontainer
 
     echo
     echo_color "Let's inspect the container looking for our new configs"
@@ -201,8 +230,9 @@ EOF
     echo
     echo_color "Commit the image that we've created"
     echo
-    read_color "sudo buildah commit \$newcontainer fedora-bashecho"
-    sudo buildah commit $newcontainer fedora-bashecho
+    read_color "sudo buildah commit \$newcontainer democontainer-bashecho"
+    echo_color "Starting commit...may take a few moments"
+    sudo buildah commit $newcontainer democontainer-bashecho
 
     echo
     echo_color "Check for our image"
@@ -222,13 +252,13 @@ EOF
 }
 
 run_image_in_docker() {
-    systemctl restart docker
+    sudo systemctl restart docker
 
     echo
     echo_color "Push our image to the Docker daemon"
     echo
-    read_color "sudo buildah push fedora-bashecho docker-daemon:fedora-bashecho:latest"
-    sudo buildah push fedora-bashecho docker-daemon:fedora-bashecho:latest
+    read_color "sudo buildah push democontainer-bashecho docker-daemon:democontainer-bashecho:latest"
+    sudo buildah push democontainer-bashecho docker-daemon:democontainer-bashecho:latest
 
     echo
     echo_color "Show our image under Docker"
@@ -239,8 +269,8 @@ run_image_in_docker() {
     echo
     echo_color "Run our image under Docker"
     echo
-    read_color "sudo docker run fedora-bashecho"
-    sudo docker run fedora-bashecho
+    read_color "sudo docker run democontainer-bashecho"
+    sudo docker run democontainer-bashecho
 
     echo
     read -p "Enter to continue"
@@ -304,7 +334,6 @@ EOF
     read_color "sudo podman run hello"
     sudo podman run hello
 
-
     echo
     read -p "Enter to continue"
     clear
@@ -332,18 +361,21 @@ buildah_from_dockerfile_rootless() {
     echo
     read_color "buildah bud -t hello -f ./Dockerfile.hello ."
     buildah bud -t hello -f ./Dockerfile.hello .
+    rhel7
 
     echo
     echo_color "Create the container from the image"
     echo
     read_color "buildah from hello"
     buildah from hello
+    rhel7
 
     echo
     echo_color "Run the container"
     echo
     read_color "buildah run hello-working-container python3 /home/HelloFromContainer.py"
     buildah run hello-working-container python3 /home/HelloFromContainer.py
+    rhel7
 
     echo
     echo_color "Now a quick advertisement from Podman."
