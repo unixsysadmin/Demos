@@ -11,7 +11,7 @@ A small 'scratch' Virtual Machine is perfect for this.  2GB of free space in /va
 
 ## Fedora
 
-An update to date fedora 29 with access to the standard repositories.
+An up to date Fedora 29 with access to the standard repositories.
 
 ## RHEL 7
 
