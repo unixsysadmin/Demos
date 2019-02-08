@@ -4,4 +4,4 @@ This demo demonstrates how to use the `podman generate kube` command.  It requir
 a functioning Kubernetes environment and will use the `kubectl` command to create
 and remove pods and containers.
 
-Requires podman, kubctl, firefox
+Requires podman, kubectl, firefox
